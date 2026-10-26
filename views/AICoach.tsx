@@ -1,7 +1,38 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { chatWithCoach } from '../services/geminiService';
 import { ChatMessage, AnalysisResult } from '../types';
+
+
+// Keep response typography explicit: Tailwind's reset removes default list/heading styles.
+const coachMarkdownComponents = {
+  h1: ({ children }) => <h4 className="mt-5 mb-2 text-lg font-bold text-slate-900 first:mt-0">{children}</h4>,
+  h2: ({ children }) => <h4 className="mt-5 mb-2 text-base font-bold text-slate-900 first:mt-0">{children}</h4>,
+  h3: ({ children }) => <h5 className="mt-4 mb-2 font-bold text-slate-900 first:mt-0">{children}</h5>,
+  h4: ({ children }) => <h5 className="mt-4 mb-2 font-semibold text-slate-900 first:mt-0">{children}</h5>,
+  h5: ({ children }) => <h6 className="mt-4 mb-2 font-semibold text-slate-900 first:mt-0">{children}</h6>,
+  h6: ({ children }) => <h6 className="mt-4 mb-2 font-semibold text-slate-900 first:mt-0">{children}</h6>,
+  p: ({ children }) => <p className="my-3 whitespace-pre-line leading-7 first:mt-0 last:mb-0">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
+  ul: ({ children }) => <ul className="my-3 list-disc space-y-2 pl-6">{children}</ul>,
+  ol: ({ children, start }) => <ol start={start} className="my-3 list-decimal space-y-2 pl-6">{children}</ol>,
+  li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
+  blockquote: ({ children }) => <blockquote className="my-4 border-l-4 border-blue-300 bg-blue-50 px-4 py-1 text-slate-600 rounded-r-lg">{children}</blockquote>,
+  a: ({ children, href }) => href
+    ? <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline underline-offset-2 break-words">{children}</a>
+    : <span>{children}</span>,
+  pre: ({ children }) => <pre className="my-4 max-w-full overflow-x-auto rounded-xl bg-slate-100 p-4 text-xs leading-6">{children}</pre>,
+  code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">{children}</code>,
+  table: ({ children }) => <div className="my-4 max-w-full overflow-x-auto rounded-xl border border-slate-200"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
+  thead: ({ children }) => <thead className="bg-slate-50">{children}</thead>,
+  th: ({ children, style }) => <th style={style} className="border-b border-slate-200 px-3 py-2 font-semibold text-slate-900">{children}</th>,
+  td: ({ children, style }) => <td style={style} className="border-b border-slate-100 px-3 py-2 align-top">{children}</td>,
+  hr: () => <hr className="my-5 border-slate-200" />,
+  // Do not load arbitrary remote images supplied in an AI response.
+  img: ({ alt }) => <span className="italic text-slate-500">{alt || 'Image'}</span>,
+} satisfies Components;
 
 export const AICoach: React.FC<{ history: AnalysisResult[] }> = ({ history }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -89,15 +120,21 @@ export const AICoach: React.FC<{ history: AnalysisResult[] }> = ({ history }) =>
       </div>
 
       {/* Messages */}
-      <div className="flex-grow overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed ${
+            <div className={`min-w-0 max-w-[95%] sm:max-w-[85%] p-4 rounded-2xl shadow-sm text-sm leading-relaxed break-words ${
               msg.role === 'user' 
                 ? 'bg-blue-600 text-white rounded-tr-none' 
                 : 'bg-white text-slate-700 rounded-tl-none border border-slate-100'
             }`}>
-              {msg.content}
+              {msg.role === 'assistant' ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={coachMarkdownComponents} skipHtml>
+                  {msg.content}
+                </ReactMarkdown>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
               <p className={`text-[10px] mt-2 font-medium opacity-60 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
